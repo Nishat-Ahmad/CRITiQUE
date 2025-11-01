@@ -11,18 +11,82 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-BASE_DIR = os.path.dirname(__file__)
-DB_PATH = os.path.join(BASE_DIR, 'campuseats.db')
+# --- Path resolution to support running app.py outside the server folder ---
+BASE_DIR = os.path.dirname(__file__)  # e.g., d:\Code\Critique
+REPO_DIR = os.path.abspath(os.path.join(BASE_DIR, '..'))  # e.g., d:\Code
 
-app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'), static_folder=os.path.join(BASE_DIR, 'static'))
-app.secret_key = os.environ.get('CAMPUS_EATS_SECRET', 'dev-secret')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+def resolve_templates_dir():
+	# Candidates in priority order
+	candidates = []
+	env_tpl = os.environ.get('CRITIQUE_TEMPLATES_DIR')
+	if env_tpl:
+		candidates.append(env_tpl)
+	# Local typical locations
+	candidates.append(os.path.join(BASE_DIR, 'templates'))
+	candidates.append(os.path.join(BASE_DIR, 'server', 'templates'))
+	# Repo fallbacks (both legacy and new names)
+	candidates.append(os.path.join(REPO_DIR, 'Critique', 'server', 'templates'))
+	candidates.append(os.path.join(REPO_DIR, 'CampusEats', 'server', 'templates'))
+	# Pick the first that exists and contains home.html (strong signal)
+	for c in candidates:
+		if os.path.isdir(c) and os.path.isfile(os.path.join(c, 'home.html')):
+			return c
+	# Fallback to the first existing directory, even if file not found
+	for c in candidates:
+		if os.path.isdir(c):
+			return c
+	# Last resort: local path
+	return os.path.join(BASE_DIR, 'templates')
 
-BASE_DIR = os.path.dirname(__file__)
-DB_PATH = os.path.join(BASE_DIR, 'campuseats.db')
+def resolve_static_dir():
+	candidates = []
+	env_static = os.environ.get('CRITIQUE_STATIC_DIR')
+	if env_static:
+		candidates.append(env_static)
+	# Local typical locations
+	candidates.append(os.path.join(BASE_DIR, 'static'))
+	candidates.append(os.path.join(BASE_DIR, 'server', 'static'))
+	# Repo fallbacks (both legacy and new names)
+	candidates.append(os.path.join(REPO_DIR, 'Critique', 'server', 'static'))
+	candidates.append(os.path.join(REPO_DIR, 'CampusEats', 'server', 'static'))
+	# Prefer one that contains styles.css
+	for c in candidates:
+		if os.path.isdir(c) and os.path.isfile(os.path.join(c, 'styles.css')):
+			return c
+	for c in candidates:
+		if os.path.isdir(c):
+			return c
+	return os.path.join(BASE_DIR, 'static')
 
-app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'), static_folder=os.path.join(BASE_DIR, 'static'))
-app.secret_key = os.environ.get('CAMPUS_EATS_SECRET', 'dev-secret')
+TEMPLATES_DIR = resolve_templates_dir()
+STATIC_DIR = resolve_static_dir()
+
+def resolve_db_path():
+	# 1) Environment override
+	env_db = os.environ.get('CRITIQUE_DB_PATH')
+	if env_db:
+		return env_db
+	# 2) Prefer an existing DB from common locations (both names)
+	candidates = [
+		os.path.join(BASE_DIR, 'critique.db'),
+		os.path.join(BASE_DIR, 'campuseats.db'),
+		os.path.join(BASE_DIR, 'server', 'critique.db'),
+		os.path.join(BASE_DIR, 'server', 'campuseats.db'),
+		os.path.join(REPO_DIR, 'Critique', 'server', 'critique.db'),
+		os.path.join(REPO_DIR, 'Critique', 'server', 'campuseats.db'),
+		os.path.join(REPO_DIR, 'CampusEats', 'server', 'critique.db'),
+		os.path.join(REPO_DIR, 'CampusEats', 'server', 'campuseats.db'),
+	]
+	for c in candidates:
+		if os.path.exists(c):
+			return c
+	# 3) Default to a new name aligned with the project rename
+	return os.path.join(BASE_DIR, 'critique.db')
+
+DB_PATH = resolve_db_path()
+
+app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
+app.secret_key = os.environ.get('CRITIQUE_SECRET') or os.environ.get('CAMPUS_EATS_SECRET', 'dev-secret')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(app)
