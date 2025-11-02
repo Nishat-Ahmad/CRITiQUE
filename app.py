@@ -97,6 +97,32 @@ def now_ts():
 	return int(datetime.utcnow().timestamp() * 1000)
 
 
+# Shared constants
+PLACE_TYPES = [
+	'Cafeteria',
+	'Cafe',
+	'Restaurant',
+	'Food Truck',
+	'Bakery',
+	'Fast Food',
+	'Desserts',
+	'Beverages',
+	'Other'
+]
+
+
+def compute_reviews_per_day(n_days: int = 14):
+    now = datetime.utcnow()
+    days = []
+    for i in range(n_days - 1, -1, -1):
+        d = now - timedelta(days=i)
+        start = int(datetime(d.year, d.month, d.day).timestamp() * 1000)
+        end = start + 24 * 60 * 60 * 1000
+        count = Review.query.filter(Review.created_at >= start, Review.created_at < end).count()
+        days.append({'date': datetime.utcfromtimestamp(start / 1000).strftime('%Y-%m-%d'), 'count': count})
+    return days
+
+
 class User(db.Model):
 	id = db.Column(db.String, primary_key=True)
 	email = db.Column(db.String, unique=True, nullable=False)
@@ -187,18 +213,7 @@ def inject_user():
 	user = None
 	if uid:
 		user = User.query.get(uid)
-	place_types = [
-		'Cafeteria',
-		'Cafe',
-		'Restaurant',
-		'Food Truck',
-		'Bakery',
-		'Fast Food',
-		'Desserts',
-		'Beverages',
-		'Other'
-	]
-	return {'current_user': user, 'place_types': place_types}
+	return {'current_user': user, 'place_types': PLACE_TYPES}
 
 
 @app.route('/')
@@ -231,7 +246,8 @@ def register_view():
 			return redirect(url_for('register_view'))
 		role = 'student'
 		admin_code = request.form.get('admin_code')
-		if admin_code == 'campuseatsadmin2025':
+		valid_codes = [os.environ.get('CRITIQUE_ADMIN_CODE'), 'campuseatsadmin2025']
+		if admin_code and admin_code in [c for c in valid_codes if c]:
 			role = 'admin'
 		user = User(id=str(uuid4()), email=email, name=name, university=request.form.get('university',''), password=request.form.get('password','pass'), role=role)
 		db.session.add(user)
@@ -281,7 +297,6 @@ def new_place():
 			name=name,
 			type=request.form.get('type',''),
 			address=request.form.get('address',''),
-			photo=request.form.get('photo',''),
 			tags=tags,
 			description=request.form.get('description',''),
 			creator_id=user_id
@@ -411,14 +426,7 @@ def dashboard():
 			starOnlyRatio=None,
 			averageRatingPerPlace=None,
 			activeUsersToday=None)
-	now = datetime.utcnow()
-	days = []
-	for i in range(13, -1, -1):
-		d = now - timedelta(days=i)
-		start = int(datetime(d.year, d.month, d.day).timestamp() * 1000)
-		end = start + 24*60*60*1000
-		count = Review.query.filter(Review.created_at >= start, Review.created_at < end).count()
-		days.append({'date': datetime.utcfromtimestamp(start/1000).strftime('%Y-%m-%d'), 'count': count})
+	days = compute_reviews_per_day(14)
 
 	total = Review.query.count()
 	star_only = Review.query.filter((Review.text == None) | (Review.text == '')).count()
@@ -446,16 +454,7 @@ def dashboard():
 		} for r in avg_rows
 	]
 
-	# avg trend
-	avg_trend = []
-	for i in range(13, -1, -1):
-		d = now - timedelta(days=i)
-		start = int(datetime(d.year, d.month, d.day).timestamp() * 1000)
-		end = start + 24*60*60*1000
-		revs = Review.query.filter(Review.created_at >= start, Review.created_at < end).all()
-		avg = (sum(r.rating for r in revs) / len(revs)) if revs else 0
-		avg_trend.append({'date': datetime.utcfromtimestamp(start/1000).strftime('%Y-%m-%d'), 'avg': avg})
-
+	now = datetime.utcnow()
 	day24 = int((now - timedelta(days=1)).timestamp() * 1000)
 	active_users_today = len(set([r.user_id for r in Review.query.filter(Review.created_at >= day24).all()]))
 
@@ -472,14 +471,7 @@ def dashboard():
 @app.route('/chart/reviews.png')
 def chart_reviews_png():
 	# return latest chart via regenerating
-	now = datetime.utcnow()
-	days = []
-	for i in range(13, -1, -1):
-		d = now - timedelta(days=i)
-		start = int(datetime(d.year, d.month, d.day).timestamp() * 1000)
-		end = start + 24*60*60*1000
-		count = Review.query.filter(Review.created_at >= start, Review.created_at < end).count()
-		days.append({'date': datetime.utcfromtimestamp(start/1000).strftime('%Y-%m-%d'), 'count': count})
+	days = compute_reviews_per_day(14)
 	buf = generate_reviews_per_day_chart(days)
 	return send_file(buf, mimetype='image/png')
 
@@ -489,20 +481,4 @@ if __name__ == '__main__':
 		init_db()
 		ensure_place_creator_column()
 		ensure_place_description_column()
-		# Add default admin user if not present
-		from uuid import uuid4
-		admin_email = 'admin@critique.com'
-		admin_user = User.query.filter_by(email=admin_email).first()
-		if not admin_user:
-			admin_user = User(
-				id=str(uuid4()),
-				email=admin_email,
-				name='Admin',
-				university='CampusEats',
-				password='1234',
-				role='admin'
-			)
-			db.session.add(admin_user)
-			db.session.commit()
-			print('Default admin user created: admin@critique.com / 1234')
 	app.run(host='0.0.0.0', port=5000, debug=True)
