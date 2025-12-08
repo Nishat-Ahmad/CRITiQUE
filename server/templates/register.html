@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="min-h-[80vh] flex items-center justify-center py-12 px-6">
-  <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-100">
+<div class="min-h-[80vh] flex items-center justify-center py-12 px-6 bg-stone-50 dark:bg-stone-950 transition-colors duration-300">
+  <div class="w-full max-w-md bg-white dark:bg-stone-900 rounded-3xl shadow-2xl overflow-hidden border border-stone-100 dark:border-stone-800">
     
-    <div class="bg-stone-900 px-8 py-6 text-center">
+    <div class="bg-stone-900 dark:bg-stone-950 px-8 py-6 text-center border-b border-stone-800">
       <h2 class="font-serif text-3xl font-bold text-white">Join the Table</h2>
       <p class="text-stone-400 text-sm mt-2">Create your CRITiQUE account</p>
     </div>
@@ -12,40 +12,40 @@
     <form method="post" action="/register" class="p-8 space-y-6">
       
       <div>
-        <label class="block text-xs font-bold uppercase text-stone-500 mb-1 ml-1">Full Name</label>
+        <label class="block text-xs font-bold uppercase text-stone-500 dark:text-stone-400 mb-1 ml-1">Full Name</label>
         <input name="name" type="text" required 
-          class="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all"
+          class="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all dark:text-white"
           placeholder="Gordon Ramsay">
       </div>
 
       <div>
-        <label class="block text-xs font-bold uppercase text-stone-500 mb-1 ml-1">Email Address</label>
+        <label class="block text-xs font-bold uppercase text-stone-500 dark:text-stone-400 mb-1 ml-1">Email Address</label>
         <input name="email" type="email" required 
-          class="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all"
+          class="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all dark:text-white"
           placeholder="gordon@hellskitchen.com">
       </div>
 
       <div>
-        <label class="block text-xs font-bold uppercase text-stone-500 mb-1 ml-1">University</label>
+        <label class="block text-xs font-bold uppercase text-stone-500 dark:text-stone-400 mb-1 ml-1">University</label>
         <input name="university" type="text" 
-          class="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all"
+          class="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all dark:text-white"
           placeholder="Culinary Arts Academy">
       </div>
 
       <div>
-        <label class="block text-xs font-bold uppercase text-stone-500 mb-1 ml-1">Password</label>
+        <label class="block text-xs font-bold uppercase text-stone-500 dark:text-stone-400 mb-1 ml-1">Password</label>
         <input name="password" type="password" required 
-          class="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all"
+          class="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:outline-none transition-all dark:text-white"
           placeholder="••••••••">
       </div>
 
       <div>
-        <label class="block text-xs font-bold uppercase text-stone-400 mb-1 ml-1 flex justify-between">
+        <label class="block text-xs font-bold uppercase text-stone-400 dark:text-stone-500 mb-1 ml-1 flex justify-between">
           <span>Admin Code</span>
-          <span class="text-[10px] text-stone-300">(Optional)</span>
+          <span class="text-[10px] text-stone-300 dark:text-stone-600">(Optional)</span>
         </label>
         <input name="admin_code" type="password" 
-          class="w-full bg-stone-50 border border-dashed border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all text-sm font-mono tracking-widest"
+          class="w-full bg-stone-50 dark:bg-stone-950 border border-dashed border-stone-300 dark:border-stone-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all text-sm font-mono tracking-widest dark:text-white"
           placeholder="Secret Key">
       </div>
 

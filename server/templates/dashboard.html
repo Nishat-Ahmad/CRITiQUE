@@ -20,28 +20,31 @@
   {% else %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 cursor-help" title="Unique users who posted a review in the last 24 hours.">
         <div class="text-xs font-bold uppercase text-stone-400 mb-2">Active Users (24h)</div>
         <div class="text-4xl font-serif font-bold text-stone-900">
           {{ activeUsersToday if activeUsersToday is not none else '-' }}
         </div>
       </div>
 
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
-        <div class="text-xs font-bold uppercase text-stone-400 mb-2">Star-Only Reviews</div>
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 cursor-help" title="Percentage of registered users who have posted at least one review.">
+        <div class="text-xs font-bold uppercase text-stone-400 mb-2">Contributor Conversion</div>
         <div class="text-4xl font-serif font-bold text-stone-900">
-           {% if starOnlyRatio is not none %}
-              {{ '%.0f'|format(starOnlyRatio) }}<span class="text-xl text-stone-400">%</span>
-            {% else %}
-              -
-            {% endif %}
+           {{ '%.0f'|format(contributorConversion) }}<span class="text-xl text-stone-400">%</span>
         </div>
       </div>
       
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 opacity-50">
-        <div class="text-xs font-bold uppercase text-stone-400 mb-2">Total Places</div>
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 cursor-help" title="Percentage of contributors who returned to post a second review.">
+        <div class="text-xs font-bold uppercase text-stone-400 mb-2">User Retention</div>
         <div class="text-4xl font-serif font-bold text-stone-900">
-           --
+           {{ '%.0f'|format(retentionRate) }}<span class="text-xl text-stone-400">%</span>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 cursor-help" title="Week-over-week growth in total review volume.">
+        <div class="text-xs font-bold uppercase text-stone-400 mb-2">Growth Velocity (WoW)</div>
+        <div class="text-4xl font-serif font-bold text-stone-900 {{ 'text-green-500' if growthVelocity > 0 else 'text-red-500' }}">
+           {{ '+' if growthVelocity > 0 }}{{ '%.0f'|format(growthVelocity) }}<span class="text-xl text-stone-400">%</span>
         </div>
       </div>
     </div>

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-16 px-6">
+  <div class="mb-10 text-center">
+    <h1 class="font-serif text-4xl font-bold text-stone-900 dark:text-white mb-4">Add Menu Item</h1>
+    <p class="text-stone-500 dark:text-stone-400">Add a new dish to <span class="font-bold text-stone-900 dark:text-white">{{ place.name }}</span></p>
+  </div>
+
+  <div class="bg-white dark:bg-stone-900 p-8 rounded-3xl shadow-xl border border-stone-100 dark:border-stone-800">
+    <form method="post" class="space-y-6">
+      
+      <div>
+        <label class="block text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Dish Name</label>
+        <input type="text" name="name" required class="w-full bg-stone-50 dark:bg-stone-800 border-none rounded-xl p-4 text-stone-900 dark:text-white placeholder-stone-400 focus:ring-2 focus:ring-primary transition-all" placeholder="e.g. Zinger Burger">
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Price (PKR)</label>
+        <input type="number" name="price" required class="w-full bg-stone-50 dark:bg-stone-800 border-none rounded-xl p-4 text-stone-900 dark:text-white placeholder-stone-400 focus:ring-2 focus:ring-primary transition-all" placeholder="e.g. 450">
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Photo URL</label>
+        <input type="url" name="photo" class="w-full bg-stone-50 dark:bg-stone-800 border-none rounded-xl p-4 text-stone-900 dark:text-white placeholder-stone-400 focus:ring-2 focus:ring-primary transition-all" placeholder="https://...">
+      </div>
+
+      <div class="pt-4 flex gap-4">
+        <a href="{{ url_for('place_view', place_id=place.id) }}" class="flex-1 bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 font-bold py-4 rounded-xl hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors text-center">
+          Cancel
+        </a>
+        <button type="submit" class="flex-1 bg-stone-900 dark:bg-white text-white dark:text-stone-900 font-bold py-4 rounded-xl hover:bg-primary hover:text-white transition-all shadow-lg transform hover:-translate-y-1">
+          Add Dish
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

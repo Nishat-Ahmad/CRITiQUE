@@ -92,6 +92,30 @@ class Place(Base):
     description = Column(Text, nullable=True)
     created_at = Column(Integer, default=now_ts)
 
+    dishes = relationship("Dish", back_populates="place", cascade="all, delete-orphan")
+
+class Dish(Base):
+    __tablename__ = "dish"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    price = Column(Integer, nullable=True)
+    photo = Column(String, nullable=True)
+    place_id = Column(Integer, ForeignKey('place.id'), nullable=False)
+    
+    place = relationship("Place", back_populates="dishes")
+    reviews = relationship("DishReview", back_populates="dish", cascade="all, delete-orphan")
+
+class DishReview(Base):
+    __tablename__ = "dish_review"
+    id = Column(Integer, primary_key=True, index=True)
+    dish_id = Column(Integer, ForeignKey('dish.id'), nullable=False)
+    user_id = Column(String, ForeignKey('user.id'), nullable=False)
+    rating = Column(Integer, nullable=False)
+    text = Column(Text, nullable=True)
+    created_at = Column(Integer, default=now_ts)
+    
+    dish = relationship("Dish", back_populates="reviews")
+
 class Review(Base):
     __tablename__ = "review"
     id = Column(Integer, primary_key=True, index=True)
@@ -168,6 +192,20 @@ def home(request: Request, q: str = "", tag: str = "", db: Session = Depends(get
     results = [p for p in places if q.lower() in p.name.lower() and (not tag or (p.tags and tag in p.tags.split(',')))]
     serialized = [serialize_place(p, db) for p in results]
     
+    # Search Dishes
+    serialized_dishes = []
+    if q:
+        dishes = db.query(Dish).all()
+        dish_matches = [d for d in dishes if q.lower() in d.name.lower()]
+        serialized_dishes = [{
+            'id': d.id,
+            'name': d.name,
+            'price': d.price,
+            'photo': d.photo,
+            'place_id': d.place_id,
+            'place_name': d.place.name
+        } for d in dish_matches]
+
     place_counts = []
     for p in places:
         count = db.query(Review).filter(Review.place_id == p.id).count()
@@ -176,7 +214,7 @@ def home(request: Request, q: str = "", tag: str = "", db: Session = Depends(get
     trending = [serialize_place(p[0], db) for p in place_counts[:3]]
     
     context = get_common_context(request, db)
-    context.update({"places": serialized, "trending": trending, "q": q, "tag": tag})
+    context.update({"places": serialized, "dishes": serialized_dishes, "trending": trending, "q": q, "tag": tag})
     return templates.TemplateResponse("home.html", context)
 
 @app.get("/register", response_class=HTMLResponse)
@@ -225,6 +263,12 @@ def new_place_view(request: Request, db: Session = Depends(get_db)):
     if not user_id:
         flash(request, "Please login to add a place")
         return RedirectResponse(request.url_for("login_view"), status_code=303)
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or user.role != 'admin':
+        flash(request, "Only admins can add places")
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
     return templates.TemplateResponse("add_place.html", get_common_context(request, db))
 
 @app.post("/places/new")
@@ -232,6 +276,12 @@ async def new_place_post(request: Request, name: str = Form(...), type: str = Fo
     user_id = request.session.get('user_id')
     if not user_id:
         return RedirectResponse(request.url_for("login_view"), status_code=303)
+        
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or user.role != 'admin':
+        flash(request, "Only admins can add places")
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
     p = Place(name=name, type=type, address=address, tags=tags, photo=photo, description=description, creator_id=user_id)
     db.add(p)
     db.commit()
@@ -256,8 +306,17 @@ def place_view(request: Request, place_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Recommender error: {e}")
 
+    dishes = db.query(Dish).filter(Dish.place_id == place_id).all()
+    dishes_ser = [{
+        'id': d.id,
+        'name': d.name,
+        'price': d.price,
+        'photo': d.photo,
+        'avgRating': float(db.query(func.avg(DishReview.rating)).filter(DishReview.dish_id == d.id).scalar() or 0)
+    } for d in dishes]
+
     context = get_common_context(request, db)
-    context.update({"place": serialize_place(p, db), "reviews": reviews_ser, "recommendations": recommendations})
+    context.update({"place": serialize_place(p, db), "reviews": reviews_ser, "recommendations": recommendations, "dishes": dishes_ser})
     return templates.TemplateResponse("place.html", context)
 
 @app.post("/places/{place_id}")
@@ -275,18 +334,59 @@ async def place_post_review(request: Request, place_id: int, rating: int = Form(
 
 @app.post("/places/{place_id}/delete")
 async def delete_place(request: Request, place_id: int, db: Session = Depends(get_db)):
-    user_id = request.session.get('user_id')
-    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    user = get_common_context(request, db)['current_user']
     if not user or user.role != 'admin':
-        flash(request, "Admins only")
-        return RedirectResponse(request.url_for("place_view", place_id=place_id), status_code=303)
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
     place = db.query(Place).filter(Place.id == place_id).first()
     if place:
-        db.query(Review).filter(Review.place_id == place_id).delete()
         db.delete(place)
         db.commit()
-        flash(request, "Place deleted")
+        
     return RedirectResponse(request.url_for("home"), status_code=303)
+
+
+
+@app.get("/dishes/{dish_id}", response_class=HTMLResponse)
+def dish_view(request: Request, dish_id: int, db: Session = Depends(get_db)):
+    d = db.query(Dish).filter(Dish.id == dish_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Dish not found")
+    
+    reviews = db.query(DishReview).filter(DishReview.dish_id == dish_id).order_by(DishReview.created_at.desc()).all()
+    reviews_ser = [{'id': r.id, 'user': (db.query(User).filter(User.id == r.user_id).first().name if db.query(User).filter(User.id == r.user_id).first() else r.user_id), 'rating': r.rating, 'text': r.text, 'createdAt': r.created_at, 'userId': r.user_id} for r in reviews]
+    
+    avg = db.query(func.avg(DishReview.rating)).filter(DishReview.dish_id == dish_id).scalar() or 0
+    
+    dish_data = {
+        'id': d.id,
+        'name': d.name,
+        'price': d.price,
+        'photo': d.photo,
+        'place_id': d.place_id,
+        'place_name': d.place.name,
+        'avgRating': float(avg)
+    }
+
+    context = get_common_context(request, db)
+    context.update({"dish": dish_data, "reviews": reviews_ser})
+    return templates.TemplateResponse("dish.html", context)
+
+@app.post("/dishes/{dish_id}")
+async def dish_post_review(request: Request, dish_id: int, rating: int = Form(5), text: str = Form(""), db: Session = Depends(get_db)):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        flash(request, "Please login to review")
+        return RedirectResponse(request.url_for("login_view"), status_code=303)
+    
+    r = DishReview(dish_id=dish_id, user_id=user_id, rating=rating, text=text)
+    db.add(r)
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if user: user.total_reviews = (user.total_reviews or 0) + 1
+    
+    db.commit()
+    return RedirectResponse(request.url_for("dish_view", dish_id=dish_id), status_code=303)
 
 @app.post("/reviews/{review_id}/delete")
 async def delete_review(request: Request, review_id: int, db: Session = Depends(get_db)):
@@ -329,7 +429,41 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     recent_reviews = db.query(Review).filter(Review.created_at >= day24).all()
     active_users_today = len(set([r.user_id for r in recent_reviews]))
     
-    context.update({'totalReviewsPerDay': days_data, 'starOnlyRatio': star_only_ratio, 'averageRatingPerPlace': average_rating_per_place, 'activeUsersToday': active_users_today})
+    # --- BML METRICS ---
+    
+    # 1. Retention Rate (% of users with > 1 review)
+    # Validates: Platform stickiness and habit formation.
+    users_with_reviews = db.query(User).filter(User.total_reviews > 0).count()
+    returning_users = db.query(User).filter(User.total_reviews > 1).count()
+    retention_rate = (returning_users / users_with_reviews * 100) if users_with_reviews else 0
+
+    # 2. Contributor Conversion (% of registered users who have posted a review)
+    # Validates: The crowdsourcing business model. Are users consuming or producing?
+    total_users = db.query(User).count()
+    contributor_conversion = (users_with_reviews / total_users * 100) if total_users else 0
+
+    # 3. Growth Velocity (Week-over-Week Review Growth)
+    # Validates: Viral growth and adoption rate.
+    week_ms = 7 * 24 * 60 * 60 * 1000
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    
+    this_week_count = db.query(Review).filter(Review.created_at >= (now_ms - week_ms)).count()
+    last_week_count = db.query(Review).filter(Review.created_at >= (now_ms - 2 * week_ms), Review.created_at < (now_ms - week_ms)).count()
+    
+    if last_week_count > 0:
+        growth_velocity = ((this_week_count - last_week_count) / last_week_count) * 100
+    else:
+        growth_velocity = 100 if this_week_count > 0 else 0
+
+    context.update({
+        'totalReviewsPerDay': days_data, 
+        'starOnlyRatio': star_only_ratio, 
+        'averageRatingPerPlace': average_rating_per_place, 
+        'activeUsersToday': active_users_today,
+        'retentionRate': retention_rate,
+        'contributorConversion': contributor_conversion,
+        'growthVelocity': growth_velocity
+    })
     return templates.TemplateResponse("dashboard.html", context)
 
 @app.get("/chart/reviews.png")
@@ -355,6 +489,66 @@ def chart_reviews_png(db: Session = Depends(get_db)):
     plt.close(fig)
     buf.seek(0)
     return Response(content=buf.getvalue(), media_type="image/png")
+
+@app.get("/places/{place_id}/edit", response_class=HTMLResponse)
+def edit_place_view(request: Request, place_id: int, db: Session = Depends(get_db)):
+    user = get_common_context(request, db)['current_user']
+    if not user or user.role != 'admin':
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
+    place = db.query(Place).filter(Place.id == place_id).first()
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+        
+    context = get_common_context(request, db)
+    context.update({"place": place})
+    return templates.TemplateResponse("edit_place.html", context)
+
+@app.post("/places/{place_id}/edit")
+async def edit_place_post(request: Request, place_id: int, name: str = Form(...), type: str = Form(""), address: str = Form(""), tags: str = Form(""), photo: str = Form(""), description: str = Form(""), db: Session = Depends(get_db)):
+    user = get_common_context(request, db)['current_user']
+    if not user or user.role != 'admin':
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
+    place = db.query(Place).filter(Place.id == place_id).first()
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+        
+    place.name = name
+    place.type = type
+    place.address = address
+    place.tags = tags
+    place.photo = photo
+    place.description = description
+    
+    db.commit()
+    return RedirectResponse(request.url_for("place_view", place_id=place_id), status_code=303)
+
+@app.get("/places/{place_id}/add_dish", response_class=HTMLResponse)
+def add_dish_view(request: Request, place_id: int, db: Session = Depends(get_db)):
+    user = get_common_context(request, db)['current_user']
+    if not user or user.role != 'admin':
+        flash(request, "Admins only")
+        return RedirectResponse(request.url_for("place_view", place_id=place_id), status_code=303)
+        
+    place = db.query(Place).filter(Place.id == place_id).first()
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+        
+    context = get_common_context(request, db)
+    context.update({"place": place})
+    return templates.TemplateResponse("add_dish.html", context)
+
+@app.post("/places/{place_id}/add_dish")
+async def add_dish_post(request: Request, place_id: int, name: str = Form(...), price: int = Form(...), photo: str = Form(""), db: Session = Depends(get_db)):
+    user = get_common_context(request, db)['current_user']
+    if not user or user.role != 'admin':
+        return RedirectResponse(request.url_for("home"), status_code=303)
+        
+    d = Dish(name=name, price=price, photo=photo, place_id=place_id)
+    db.add(d)
+    db.commit()
+    return RedirectResponse(request.url_for("place_view", place_id=place_id), status_code=303)
 
 if __name__ == '__main__':
     import uvicorn

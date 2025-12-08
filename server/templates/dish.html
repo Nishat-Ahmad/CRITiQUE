@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="bg-stone-50 dark:bg-stone-950 min-h-screen pb-20 transition-colors duration-300">
+  
+  <div class="relative h-[400px] bg-stone-900 overflow-hidden">
+    <img 
+      src="{{ dish.photo if dish.photo else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=2000&auto=format&fit=crop' }}" 
+      class="w-full h-full object-cover opacity-60"
+      alt="{{ dish.name }}"
+    >
+    <div class="absolute inset-0 bg-gradient-to-t from-stone-900 via-transparent to-transparent"></div>
+    
+    <div class="absolute bottom-0 left-0 w-full p-8 md:p-16">
+      <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <div class="flex items-center gap-3 mb-4">
+              <a href="{{ url_for('place_view', place_id=dish.place_id) }}" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-widest shadow-lg hover:bg-primary-hover transition-colors">
+                ← {{ dish.place_name }}
+              </a>
+            </div>
+            <h1 class="font-serif text-6xl md:text-7xl font-bold text-white mb-4 shadow-sm leading-none">{{ dish.name }}</h1>
+            <p class="text-stone-300 text-xl md:text-2xl flex items-center gap-2 font-light">
+              PKR {{ dish.price }}
+            </p>
+          </div>
+          
+          <div class="flex items-center gap-6 bg-white/10 backdrop-blur-md px-8 py-6 rounded-2xl border border-white/20">
+            <div class="text-center">
+              <div class="text-5xl font-bold text-yellow-400">{{ '%.1f'|format(dish.avgRating) }}</div>
+              <div class="text-sm text-stone-300 uppercase tracking-wide font-bold">Average</div>
+            </div>
+            <div class="h-12 w-px bg-white/20"></div>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-white">{{ reviews|length }}</div>
+              <div class="text-sm text-stone-300 uppercase tracking-wide font-bold">Reviews</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-3 gap-16">
+    
+    <div class="lg:col-span-2 space-y-16">
+      
+      <section>
+        <h3 class="font-serif text-3xl font-bold text-stone-900 dark:text-white mb-10 flex items-center gap-4">
+          Dish Verdict
+          <span class="text-lg font-sans font-normal text-stone-400 bg-stone-100 dark:bg-stone-800 px-3 py-1 rounded-full">{{ reviews|length }}</span>
+        </h3>
+
+        {% if reviews %}
+          <div class="space-y-8">
+            {% for r in reviews %}
+              <div class="bg-white dark:bg-stone-900 p-8 rounded-3xl border border-stone-100 dark:border-stone-800 shadow-sm hover:shadow-md transition-all">
+                <div class="flex justify-between items-start mb-6">
+                  <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                      {{ r.user[:2].upper() }}
+                    </div>
+                    <div>
+                      <div class="font-bold text-stone-900 dark:text-white text-lg">{{ r.user }}</div>
+                      <div class="text-sm text-stone-400 dark:text-stone-500 font-bold uppercase tracking-wider">{{ r.createdAt|time_ago }}</div>
+                    </div>
+                  </div>
+                  <div class="flex text-yellow-400 text-lg">
+                    {% for _ in range(r.rating) %}★{% endfor %}
+                    {% for _ in range(5 - r.rating) %}
+                      <span class="text-stone-200 dark:text-stone-700">★</span>
+                    {% endfor %}
+                  </div>
+                </div>
+                <p class="text-stone-600 dark:text-stone-300 text-lg leading-relaxed">{{ r.text }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-12 bg-white dark:bg-stone-900 rounded-3xl border border-stone-100 dark:border-stone-800">
+            <div class="text-6xl mb-4">🍽️</div>
+            <h3 class="text-xl font-bold text-stone-900 dark:text-white mb-2">No reviews yet</h3>
+            <p class="text-stone-500 dark:text-stone-400">Be the first to review this dish!</p>
+          </div>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="lg:col-span-1">
+      <div class="sticky top-32 space-y-8">
+        <div class="bg-white dark:bg-stone-900 p-8 rounded-3xl shadow-lg border border-stone-100 dark:border-stone-800">
+          <h3 class="font-serif text-2xl font-bold text-stone-900 dark:text-white mb-6">Rate this Dish</h3>
+          
+          {% if current_user %}
+            <form method="post" action="{{ url_for('dish_post_review', dish_id=dish.id) }}" class="space-y-6">
+              <div>
+                <label class="block text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Rating</label>
+                <div class="flex gap-4 text-3xl text-stone-300 dark:text-stone-700 cursor-pointer hover:text-yellow-400 transition-colors" id="star-rating">
+                  {% for i in range(1, 6) %}
+                    <button type="button" onclick="setRating({{ i }})" class="focus:outline-none hover:scale-110 transition-transform">★</button>
+                  {% endfor %}
+                </div>
+                <input type="hidden" name="rating" id="rating-input" value="5">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Your Review</label>
+                <textarea name="text" rows="4" class="w-full bg-stone-50 dark:bg-stone-800 border-none rounded-xl p-4 text-stone-900 dark:text-white placeholder-stone-400 focus:ring-2 focus:ring-primary transition-all" placeholder="How was the taste? Worth the price?"></textarea>
+              </div>
+              
+              <button type="submit" class="w-full bg-stone-900 dark:bg-white text-white dark:text-stone-900 font-bold py-4 rounded-xl hover:bg-primary hover:text-white transition-all shadow-lg transform hover:-translate-y-1">
+                Post Review
+              </button>
+            </form>
+          {% else %}
+            <div class="text-center py-6">
+              <p class="text-stone-500 dark:text-stone-400 mb-4">Log in to share your experience.</p>
+              <a href="{{ url_for('login_view') }}" class="block w-full bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-white font-bold py-3 rounded-xl hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors">
+                Login
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function setRating(n) {
+  document.getElementById('rating-input').value = n;
+  const stars = document.querySelectorAll('#star-rating button');
+  stars.forEach((s, i) => {
+    s.style.color = i < n ? '#FACC15' : '';
+  });
+}
+// Init with 5 stars
+setRating(5);
+</script>
+{% endblock %}

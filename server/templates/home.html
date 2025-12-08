@@ -22,8 +22,8 @@
           class="w-full pl-6 pr-4 py-4 rounded-full text-stone-900 shadow-2xl focus:ring-4 focus:ring-primary/50 focus:outline-none text-lg transition-all"
           hx-get="/" 
           hx-trigger="keyup changed delay:500ms" 
-          hx-target="#place-grid" 
-          hx-select="#place-grid"
+          hx-target="#results-area" 
+          hx-select="#results-area"
           hx-push-url="true"
         >
         <button class="absolute right-3 top-2 bottom-2 bg-primary hover:bg-primary-hover text-white px-6 rounded-full font-bold transition-all">
@@ -33,11 +33,64 @@
     </div>
   </section>
 
-  <section class="max-w-6xl mx-auto px-6 py-16">
+  <section id="results-area" class="max-w-6xl mx-auto px-6 py-16">
     
-    <div class="flex items-end justify-between mb-12 border-b border-stone-200 dark:border-stone-800 pb-4">
-      <h2 class="font-serif text-3xl font-bold text-stone-900 dark:text-white">Trending Spots</h2>
-      <a href="{{ url_for('home') }}" class="text-sm font-bold uppercase tracking-widest text-primary hover:underline">View All</a>
+    {% if not q and not tag %}
+    <div class="mb-16">
+      <div class="flex items-end justify-between mb-8 border-b border-stone-200 dark:border-stone-800 pb-4">
+        <h2 class="font-serif text-3xl font-bold text-stone-900 dark:text-white">Trending Now 🔥</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {% for p in trending %}
+          <a href="{{ url_for('place_view', place_id=p.id) }}" class="group block h-full">
+            <div class="bg-white dark:bg-stone-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-stone-100 dark:border-stone-800 h-full flex flex-col">
+              <div class="h-48 overflow-hidden relative bg-stone-200 dark:bg-stone-800">
+                <img src="{{ p.photo if p.photo else 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2070&auto=format&fit=crop' }}" alt="{{ p.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                <div class="absolute top-4 right-4 bg-white/90 dark:bg-stone-900/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700">{{ p.type or 'Spot' }}</div>
+              </div>
+              <div class="p-6 flex flex-col flex-grow">
+                <div class="flex justify-between items-start mb-2">
+                  <h3 class="font-serif text-xl font-bold text-stone-900 dark:text-white group-hover:text-primary transition-colors">{{ p.name }}</h3>
+                  <div class="flex items-center gap-1 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded text-green-700 dark:text-green-400 font-bold text-sm"><span>★</span><span>{{ '%.1f'|format(p.avgRating) }}</span></div>
+                </div>
+                <div class="mt-auto flex flex-wrap gap-2">
+                  {% for tag in p.tags[:3] %}
+                    <span class="text-[10px] uppercase font-bold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded-md">#{{ tag.strip() }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if dishes %}
+    <div class="mb-16">
+        <h2 class="font-serif text-2xl font-bold text-stone-900 dark:text-white mb-6">Dishes matching "{{ q }}"</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {% for d in dishes %}
+                <a href="{{ url_for('dish_view', dish_id=d.id) }}" class="block group">
+                <div class="bg-white dark:bg-stone-900 rounded-xl p-4 shadow-sm border border-stone-100 dark:border-stone-800 flex gap-4 items-center hover:border-primary/50 transition-colors">
+                    <img src="{{ d.photo or 'https://placehold.co/100' }}" class="w-20 h-20 rounded-lg object-cover bg-stone-200">
+                    <div>
+                        <h3 class="font-bold text-lg text-stone-900 dark:text-white group-hover:text-primary transition-colors">{{ d.name }}</h3>
+                        <p class="text-primary font-bold">{{ d.price }} PKR</p>
+                        <span class="text-xs text-stone-500">at {{ d.place_name }}</span>
+                    </div>
+                </div>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex items-end justify-between mb-8 border-b border-stone-200 dark:border-stone-800 pb-4">
+      <h2 class="font-serif text-3xl font-bold text-stone-900 dark:text-white">
+        {% if q %}Places matching "{{ q }}"{% else %}All Spots{% endif %}
+      </h2>
+      {% if not q %}<a href="{{ url_for('home') }}" class="text-sm font-bold uppercase tracking-widest text-primary hover:underline">View All</a>{% endif %}
     </div>
 
     <div id="place-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
