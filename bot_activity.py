@@ -544,9 +544,8 @@ def phase_pulse(db, manifest_users, place_map):
     used_ts = existing_timestamps(db)
     loyalists = [u for u in manifest_users if ("Hostel 5" in u["hostel"] or "Hostel 6" in u["hostel"])]
     user_objs = {u["email"]: db.query(User).filter(User.email == u["email"]).first() for u in loyalists}
-    if random.random() < 0.25:
-        return
-    n = random.choice([1,2])
+    # Generate between 1 and 10 loyalist reviews per pulse, gaussian left skewed
+    n = random.choices([1,2,3,4,5,6,7,8,9,10], weights=[0.05,0.05,0.2,0.3,0.1,0.1,0.05,0.05,0.05,0.05], k=1)[0]
     chosen = random.sample(loyalists, k=n)
     for loyal in chosen:
         ts = unique_ts_now(used_ts, offset_ms_max=60000)
@@ -563,10 +562,10 @@ def phase_pulse(db, manifest_users, place_map):
         mood = random.choice(["late-night hunger","this saved my day","loyalty comfort food"])
         if make_dish:
             dish_obj = random.choice(dishes)
-            text = generate_review_text(user_obj.name, place_obj.name, dish_obj.name, True, mood)
+            text, _ = generate_review_text(user_obj.name, place_obj.name, dish_obj.name, True, mood)
             commit_review_dish(db, user_obj, dish_obj, rating, text, ts)
         else:
-            text = generate_review_text(user_obj.name, place_obj.name, None, False, mood)
+            text, _ = generate_review_text(user_obj.name, place_obj.name, None, False, mood)
             commit_review_place(db, user_obj, place_obj, rating, text, ts)
 
 def main():
