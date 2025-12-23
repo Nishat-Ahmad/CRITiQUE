@@ -220,6 +220,7 @@ def home(request: Request, q: str = "", tag: str = "", db: Session = Depends(get
     
     # Recommendations
     recommendations = []
+    recommended_dishes = []
     if context['current_user']:
         user = context['current_user']
         # Fetch data for recommender
@@ -249,7 +250,6 @@ def home(request: Request, q: str = "", tag: str = "", db: Session = Depends(get
         recommendations = [serialize_place(p, db) for p in rec_places]
 
         # Dish Recommendations (Limit 2)
-        recommended_dishes = []
         try:
             all_dish_reviews = db.query(DishReview).all()
             dish_reviews_data = [{'user_id': r.user_id, 'place_id': r.dish_id, 'rating': r.rating} for r in all_dish_reviews]
