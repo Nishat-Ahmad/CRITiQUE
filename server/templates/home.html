@@ -35,6 +35,61 @@
 
   <section id="results-area" class="max-w-6xl mx-auto px-6 py-16">
     
+    {% if recommendations or recommended_dishes %}
+    <div class="mb-16">
+      <div class="flex items-end justify-between mb-8 border-b border-stone-200 dark:border-stone-800 pb-4">
+        <h2 class="font-serif text-3xl font-bold text-stone-900 dark:text-white">Recommended for You ✨</h2>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Restaurant Recommendation -->
+        {% for p in recommendations %}
+        <div class="lg:col-span-2">
+            <h3 class="text-sm font-bold uppercase text-stone-500 mb-4 tracking-widest">Top Pick: Restaurant</h3>
+            <a href="{{ url_for('place_view', place_id=p.id) }}" class="group block h-full">
+                <div class="bg-white dark:bg-stone-900 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-stone-100 dark:border-stone-800 h-full flex flex-col relative">
+                  <div class="h-64 overflow-hidden relative bg-stone-200 dark:bg-stone-800">
+                    <img src="{{ p.photo if p.photo else 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2070&auto=format&fit=crop' }}" alt="{{ p.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                    <div class="absolute top-6 right-6 bg-white/90 dark:bg-stone-900/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wide shadow-sm text-stone-900 dark:text-white border border-stone-200 dark:border-stone-700">{{ p.type or 'Spot' }}</div>
+                  </div>
+                  <div class="p-8 flex flex-col flex-grow">
+                    <div class="flex justify-between items-start mb-4">
+                      <h3 class="font-serif text-3xl font-bold text-stone-900 dark:text-white group-hover:text-primary transition-colors">{{ p.name }}</h3>
+                      <div class="flex items-center gap-1 bg-green-50 dark:bg-green-900/30 px-3 py-1.5 rounded-lg text-green-700 dark:text-green-400 font-bold text-lg"><span>★</span><span>{{ '%.1f'|format(p.avgRating) }}</span></div>
+                    </div>
+                    <p class="text-stone-500 dark:text-stone-400 text-lg line-clamp-2 mb-6">{{ p.description }}</p>
+                    <div class="mt-auto flex flex-wrap gap-2">
+                      {% for tag in p.tags[:4] %}
+                        <span class="text-xs uppercase font-bold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-lg">#{{ tag.strip() }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+
+        <!-- Dish Recommendations -->
+        <div class="lg:col-span-1 flex flex-col gap-6">
+            <h3 class="text-sm font-bold uppercase text-stone-500 mb-[-1rem] tracking-widest">Must Try Dishes</h3>
+            {% for d in recommended_dishes %}
+                <a href="{{ url_for('dish_view', dish_id=d.id) }}" class="block group flex-grow">
+                    <div class="bg-white dark:bg-stone-900 rounded-2xl p-4 shadow-md border border-stone-100 dark:border-stone-800 flex gap-4 items-center hover:border-primary/50 transition-all h-full">
+                        <img src="{{ d.photo or 'https://placehold.co/100' }}" class="w-24 h-24 rounded-xl object-cover bg-stone-200 shadow-sm">
+                        <div>
+                            <h3 class="font-bold text-lg text-stone-900 dark:text-white group-hover:text-primary transition-colors leading-tight mb-1">{{ d.name }}</h3>
+                            <p class="text-primary font-bold mb-1">{{ d.price }} PKR</p>
+                            <span class="text-xs text-stone-500 block">at {{ d.place_name }}</span>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
+
     {% if not q and not tag %}
     <div class="mb-16">
       <div class="flex items-end justify-between mb-8 border-b border-stone-200 dark:border-stone-800 pb-4">

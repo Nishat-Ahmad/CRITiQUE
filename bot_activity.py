@@ -470,16 +470,20 @@ def phase_seed(db, manifest_users, place_map):
     user_objs = {}
     for u in manifest_users:
         user_objs[u["email"]] = db.query(User).filter(User.email == u["email"]).first()
-    start = datetime(2025,12,14, tzinfo=timezone.utc)
-    days = [start + timedelta(days=i) for i in range(6)]
-    churn_weights = [0.35,0.30,0.15,0.10,0.07,0.03]
+    
+    # Modified to run for the past 3 days (today included)
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=2)
+    days = [start + timedelta(days=i) for i in range(3)]
+    
+    churn_weights = [0.33, 0.33, 0.34] # Even distribution for 3 days
     for c in churners:
         # Skip churners who already have any reviews in the DB. This prevents
         # duplicate churner posts if --seed is run multiple times.
         user_obj = user_objs[c["email"]]
-        existing_any = (user_obj.total_reviews or 0) > 0 or db.query(Review).filter(Review.user_id == user_obj.id).count() > 0 or db.query(DishReview).filter(DishReview.user_id == user_obj.id).count() > 0
-        if existing_any:
-            continue
+        # existing_any = (user_obj.total_reviews or 0) > 0 or db.query(Review).filter(Review.user_id == user_obj.id).count() > 0 or db.query(DishReview).filter(DishReview.user_id == user_obj.id).count() > 0
+        # if existing_any:
+        #     continue
 
         day = random.choices(days, weights=churn_weights, k=1)[0]
         ts = unique_ts_for_day(day, used_ts)

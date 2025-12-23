@@ -77,6 +77,27 @@
         </div>
       </section>
 
+      {% if similar_places %}
+      <section class="mb-16">
+        <h3 class="font-serif text-3xl font-bold text-stone-900 dark:text-white mb-8">Students Also Liked</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {% for p in similar_places %}
+            <a href="{{ url_for('place_view', place_id=p.id) }}" class="group block">
+              <div class="bg-white dark:bg-stone-900 rounded-xl overflow-hidden border border-stone-100 dark:border-stone-800 hover:shadow-lg transition-all">
+                <div class="h-32 bg-stone-200 dark:bg-stone-800 relative">
+                   <img src="{{ p.photo if p.photo else 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2070&auto=format&fit=crop' }}" class="w-full h-full object-cover">
+                </div>
+                <div class="p-4">
+                  <h4 class="font-bold text-stone-900 dark:text-white group-hover:text-primary truncate">{{ p.name }}</h4>
+                  <p class="text-xs text-stone-500">{{ p.type }}</p>
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if dishes %}
       <section class="mb-16">
         <h3 class="font-serif text-3xl font-bold text-stone-900 dark:text-white mb-8">Menu Highlights</h3>

@@ -18,6 +18,8 @@ from starlette.middleware.sessions import SessionMiddleware
 # SQLAlchemy Imports
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, func
 from sqlalchemy.orm import sessionmaker, relationship, Session, declarative_base
+from recommender import HybridRecommender, CollaborativeRecommender
+import pandas as pd
 
 # --- 1. CONFIGURATION & DATABASE SETUP ---
 
@@ -79,6 +81,7 @@ class User(Base):
     university = Column(String, nullable=True)
     password = Column(String, nullable=True)
     total_reviews = Column(Integer, default=0)
+    preferences = Column(String, nullable=True)
 
 class Place(Base):
     __tablename__ = "place"
@@ -214,7 +217,66 @@ def home(request: Request, q: str = "", tag: str = "", db: Session = Depends(get
     trending = [serialize_place(p[0], db) for p in place_counts[:3]]
     
     context = get_common_context(request, db)
-    context.update({"places": serialized, "dishes": serialized_dishes, "trending": trending, "q": q, "tag": tag})
+    
+    # Recommendations
+    recommendations = []
+    if context['current_user']:
+        user = context['current_user']
+        # Fetch data for recommender
+        places_data = [{'id': p.id, 'name': p.name, 'tags': p.tags, 'description': p.description, 'type': p.type} for p in places]
+        
+        # 1. Place Reviews
+        all_reviews = db.query(Review).all()
+        reviews_data = [{'user_id': r.user_id, 'place_id': r.place_id, 'rating': r.rating} for r in all_reviews]
+        
+        # 2. Dish Reviews (mapped to Place)
+        dish_reviews = db.query(DishReview).join(Dish).all()
+        for dr in dish_reviews:
+            reviews_data.append({
+                'user_id': dr.user_id,
+                'place_id': dr.dish.place_id,
+                'rating': dr.rating
+            })
+        
+        recommender = HybridRecommender(places_data, reviews_data)
+        
+        user_prefs = user.preferences.split(',') if user.preferences else []
+        user_prefs = [p.strip() for p in user_prefs if p.strip()]
+        
+        # Limit to 1 Place
+        rec_ids = recommender.recommend(user.id, user_preferences=user_prefs, limit=1)
+        rec_places = [p for p in places if p.id in rec_ids]
+        recommendations = [serialize_place(p, db) for p in rec_places]
+
+        # Dish Recommendations (Limit 2)
+        recommended_dishes = []
+        try:
+            all_dish_reviews = db.query(DishReview).all()
+            dish_reviews_data = [{'user_id': r.user_id, 'place_id': r.dish_id, 'rating': r.rating} for r in all_dish_reviews]
+            
+            dish_collab = CollaborativeRecommender(dish_reviews_data)
+            rec_dish_ids = dish_collab.recommend_for_user(user.id, limit=2)
+            
+            # Fallback: Top rated dishes
+            if len(rec_dish_ids) < 2:
+                 top_dishes = db.query(Dish.id).join(DishReview).group_by(Dish.id).order_by(func.avg(DishReview.rating).desc()).limit(2).all()
+                 for td in top_dishes:
+                     if td.id not in rec_dish_ids:
+                         rec_dish_ids.append(td.id)
+            
+            rec_dishes_objs = db.query(Dish).filter(Dish.id.in_(rec_dish_ids[:2])).all()
+            recommended_dishes = [{
+                'id': d.id,
+                'name': d.name,
+                'price': d.price,
+                'photo': d.photo,
+                'place_id': d.place_id,
+                'place_name': d.place.name
+            } for d in rec_dishes_objs]
+        except Exception as e:
+            print(f"Dish Rec Error: {e}")
+
+    context.update({"places": serialized, "dishes": serialized_dishes, "trending": trending, "recommendations": recommendations, "recommended_dishes": recommended_dishes, "q": q, "tag": tag})
     return templates.TemplateResponse("home.html", context)
 
 @app.get("/register", response_class=HTMLResponse)
@@ -222,7 +284,7 @@ def register_view(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("register.html", get_common_context(request, db))
 
 @app.post("/register")
-async def register_post(request: Request, email: str = Form(...), name: str = Form(...), university: str = Form(""), password: str = Form(...), admin_code: str = Form(""), db: Session = Depends(get_db)):
+async def register_post(request: Request, email: str = Form(...), name: str = Form(...), university: str = Form(""), password: str = Form(...), admin_code: str = Form(""), preferences: str = Form(""), db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == email).first():
         flash(request, "Email already exists")
         return RedirectResponse(request.url_for("register_view"), status_code=303)
@@ -230,7 +292,7 @@ async def register_post(request: Request, email: str = Form(...), name: str = Fo
     valid_codes = [os.environ.get('CRITIQUE_ADMIN_CODE'), 'campuseatsadmin2025']
     if admin_code in [c for c in valid_codes if c]:
         role = 'admin'
-    user = User(id=str(uuid4()), email=email, name=name, university=university, password=password, role=role)
+    user = User(id=str(uuid4()), email=email, name=name, university=university, password=password, role=role, preferences=preferences)
     db.add(user)
     db.commit()
     request.session['user_id'] = user.id
@@ -296,13 +358,34 @@ def place_view(request: Request, place_id: int, db: Session = Depends(get_db)):
     reviews_ser = [{'id': r.id, 'user': (db.query(User).filter(User.id == r.user_id).first().name if db.query(User).filter(User.id == r.user_id).first() else r.user_id), 'rating': r.rating, 'text': r.text, 'createdAt': r.created_at, 'userId': r.user_id} for r in reviews]
     
     recommendations = []
+    similar_places = []
     try:
-        from recommender import ContentRecommender
+        from recommender import ContentRecommender, CollaborativeRecommender
         all_places = db.query(Place).all()
         places_data = [{'id': pl.id, 'name': pl.name, 'type': pl.type, 'tags': pl.tags, 'description': pl.description} for pl in all_places]
+        
+        # Content Based
         engine = ContentRecommender(places_data)
         rec_ids = engine.recommend(place_id)
         recommendations = [serialize_place(db.query(Place).get(rid), db) for rid in rec_ids]
+        
+        # Collaborative (Students also liked)
+        all_reviews = db.query(Review).all()
+        reviews_data = [{'user_id': r.user_id, 'place_id': r.place_id, 'rating': r.rating} for r in all_reviews]
+        
+        # Add Dish Reviews
+        dish_reviews = db.query(DishReview).join(Dish).all()
+        for dr in dish_reviews:
+            reviews_data.append({
+                'user_id': dr.user_id,
+                'place_id': dr.dish.place_id,
+                'rating': dr.rating
+            })
+            
+        collab_engine = CollaborativeRecommender(reviews_data)
+        sim_ids = collab_engine.get_similar_items(place_id)
+        similar_places = [serialize_place(db.query(Place).get(sid), db) for sid in sim_ids]
+        
     except Exception as e:
         print(f"Recommender error: {e}")
 
@@ -316,7 +399,7 @@ def place_view(request: Request, place_id: int, db: Session = Depends(get_db)):
     } for d in dishes]
 
     context = get_common_context(request, db)
-    context.update({"place": serialize_place(p, db), "reviews": reviews_ser, "recommendations": recommendations, "dishes": dishes_ser})
+    context.update({"place": serialize_place(p, db), "reviews": reviews_ser, "recommendations": recommendations, "similar_places": similar_places, "dishes": dishes_ser})
     return templates.TemplateResponse("place.html", context)
 
 @app.post("/places/{place_id}")
